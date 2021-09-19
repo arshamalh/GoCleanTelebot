@@ -1,0 +1,68 @@
+stages:
+  - build
+  #- deploy
+
+variables:
+  NEXUS_REPOSITORY: repository.yourypto.com
+
+  # Stage
+  IMAGE_STAGE_TAGGED_NAME: $NEXUS_REPOSITORY/stage:$CI_COMMIT_SHORT_SHA
+  IMAGE_STAGE_LATEST_TAGGED_NAME: $NEXUS_REPOSITORY/core/signalvip/stage:latest
+
+  # Production
+  IMAGE_PRODUCTION_TAGGED_NAME: $NEXUS_REPOSITORY/production:$CI_COMMIT_SHORT_SHA
+  IMAGE_PRODUCTION_LATEST_TAGGED_NAME: $NEXUS_REPOSITORY/core/signalvip/production:latest
+
+  DOCKER_DRIVER: overlay
+
+
+
+# Stage (Dev branch)
+stage_build:
+  stage: build
+  image: docker:stable-dind
+  only:
+    - dev
+  before_script:
+    - echo $NEXUS_PASSWORD | docker login --username $NEXUS_USER --password-stdin $NEXUS_REPOSITORY
+  script:
+    - docker build --build-arg GITLAB_LOGIN=$GITLAB_LOGIN  --build-arg GITLAB_TOKEN=$GITLAB_TOKEN -t $IMAGE_STAGE_TAGGED_NAME .
+    - docker tag $IMAGE_STAGE_TAGGED_NAME $IMAGE_STAGE_LATEST_TAGGED_NAME
+    - docker push $IMAGE_STAGE_TAGGED_NAME
+    - docker push $IMAGE_STAGE_LATEST_TAGGED_NAME
+  tags:
+    - dev
+
+# Production (Master branch)
+production_build:
+  stage: build
+  image: docker:stable-dind
+  only:
+    - master
+  before_script:
+    - echo $NEXUS_PASSWORD | docker login --username $NEXUS_USER --password-stdin $NEXUS_REPOSITORY
+  script:
+    - docker build --build-arg GITLAB_LOGIN=$GITLAB_LOGIN  --build-arg GITLAB_TOKEN=$GITLAB_TOKEN -t $IMAGE_STAGE_TAGGED_NAME .
+    - docker tag $IMAGE_PRODUCTION_TAGGED_NAME $IMAGE_PRODUCTION_LATEST_TAGGED_NAME
+    - docker push $IMAGE_PRODUCTION_TAGGED_NAME
+    - docker push $IMAGE_PRODUCTION_LATEST_TAGGED_NAME
+  tags:
+    - prod
+
+#stage_deploy:
+#  stage: deploy
+#  image: alpine:3.12
+#  only:
+#    - dev
+#  before_script:
+#    - apk add --no-cache --no-progress ansible openssh-client
+#    - mkdir ~/.ssh
+#    - mkdir /etc/ansible
+#    - echo "StrictHostKeyChecking no" > ~/.ssh/config
+#    - echo "UserKnownHostsFile=/dev/null" >> ~/.ssh/config
+#    - cp ${CI_PRIVATE_KEY} ~/.ssh/id_ed25519
+#    - chmod 600 ~/.ssh/id_ed25519
+#  script:
+#    - todo
+#  tags:
+#    - dev
